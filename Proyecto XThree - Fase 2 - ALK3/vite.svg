@@ -1,0 +1,425 @@
+import { useState, useRef } from "react";
+import "./App.css";
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from "recharts";
+
+function App() {
+
+  const [imagenes, setImagenes] = useState([]);
+  const [respuesta, setRespuesta] = useState(null);
+  const [cargando, setCargando] = useState(false);
+
+  const inputArchivosRef = useRef(null);
+
+  const seleccionarImagenes = (e) => {
+    setImagenes(Array.from(e.target.files));
+  };
+
+  const procesarActas = async () => {
+
+    if (imagenes.length === 0) {
+      alert("Selecciona imágenes");
+      return;
+    }
+
+    const formData = new FormData();
+
+    imagenes.forEach((imagen) => {
+      formData.append("imagenes", imagen);
+    });
+
+    setCargando(true);
+
+    try {
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/procesar-actas",
+        {
+          method: "POST",
+          body: formData
+        }
+      );
+
+      const data = await response.json();
+
+      setRespuesta(data);
+
+    } catch (error) {
+
+      console.error(error);
+      alert("Error conectando con FastAPI");
+
+    } finally {
+
+      setCargando(false);
+
+    }
+
+  };
+
+  const limpiarResultados = async () => {
+
+    try {
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/limpiar-resultados",
+        {
+          method: "DELETE"
+        }
+      );
+
+      const data = await response.json();
+
+      alert(data.mensaje);
+
+      setRespuesta(null);
+      setImagenes([]);
+
+      if (inputArchivosRef.current) {
+        inputArchivosRef.current.value = "";
+      }
+
+    } catch (error) {
+
+      console.error(error);
+      alert("Error al limpiar resultados");
+
+    }
+
+  };
+
+  const resumen = respuesta?.resumen;
+
+  const datosGrafica = resumen
+    ? [
+        ...Object.entries(resumen.votos_por_partido).map(
+          ([partido, votos]) => ({
+            partido,
+            votos
+          })
+        ),
+
+        {
+          partido: "NULOS",
+          votos: resumen.votos_nulos
+        }
+
+      ]
+    : [];
+
+  const actasProcesadas =
+    respuesta?.resultados?.filter(
+      (item) => item.estado === "procesada"
+    ) || [];
+
+  const colores = [
+  "#3b82f6",
+  "#ef4444",
+  "#22c55e",
+  "#eab308",
+  "#a855f7",
+  "#06b6d4",
+  "#f97316",
+  "#14b8a6",
+  "#ec4899",
+  "#84cc16",
+  "#f43f5e",
+  "#8b5cf6",
+  "#0ea5e9",
+  "#10b981",
+  "#f59e0b",
+  "#6366f1",
+  "#d946ef",
+  "#65a30d",
+  "#dc2626",
+  "#0284c7",
+  "#7c3aed",
+  "#ea580c",
+  "#16a34a",
+  "#ca8a04",
+  "#0891b2"
+];
+
+  return (
+
+    <div className="contenedor">
+
+      <h1>Sistema de Procesamiento de Actas Electorales ALK3</h1>
+      
+      <p className="subtitulo">
+    
+      </p>
+
+      <p className="subtitulo">
+        Equipo XThree
+      </p>
+      
+      <p className="subtitulo">
+        Procesamiento y visualización de votos por partido del municipio de Malinalco.
+      </p>
+
+      <div className="tarjeta panel-carga">
+
+        <div>
+
+          <h2>Cargar actas</h2>
+
+          <input
+            ref={inputArchivosRef}
+            type="file"
+            multiple
+            accept=".png,.jpg,.jpeg"
+            onChange={seleccionarImagenes}
+          />
+
+          <p>
+            <span className="badge">
+              {imagenes.length}
+            </span>
+            {" "}
+            actas seleccionadas
+          </p>
+
+        </div>
+
+        <div className="grupo-botones">
+
+          <button
+            onClick={procesarActas}
+            disabled={cargando}
+          >
+
+            {
+              cargando
+                ? "Procesando..."
+                : "Procesar Actas"
+            }
+
+          </button>
+
+          <button
+            className="btn-limpiar"
+            onClick={limpiarResultados}
+          >
+            Limpiar resultados
+          </button>
+
+        </div>
+
+      </div>
+
+      {
+        resumen && (
+
+          <>
+
+            <div className="grid">
+
+              <div className="card-resumen">
+                <h3>Actas Procesadas</h3>
+                <p>{resumen.actas_procesadas}</p>
+              </div>
+
+              <div className="card-resumen">
+                <h3>Total de Votos</h3>
+                <p>{resumen.total_votos}</p>
+              </div>
+
+              <div className="card-resumen">
+                <h3>Votos Nulos</h3>
+                <p>{resumen.votos_nulos}</p>
+              </div>
+
+            </div>
+
+            <div className="contenedor-graficas">
+
+              <div className="tarjeta">
+
+                <h2>Votos por Partido</h2>
+
+                <ResponsiveContainer width="100%" height={400}>
+
+                  <BarChart data={datosGrafica}>
+
+                    <CartesianGrid strokeDasharray="3 3" />
+
+                    <XAxis dataKey="partido" />
+
+                    <YAxis />
+
+                    <Tooltip />
+
+                    <Bar
+                      dataKey="votos"
+                      fill="#3b82f6"
+                      radius={[10, 10, 0, 0]}
+                    />
+
+                  </BarChart>
+
+                </ResponsiveContainer>
+
+              </div>
+
+              <div className="tarjeta">
+
+                <h2>Distribución de Votos</h2>
+
+                <ResponsiveContainer width="100%" height={400}>
+
+                  <PieChart>
+
+                    <Pie
+                      data={datosGrafica}
+                      dataKey="votos"
+                      nameKey="partido"
+                      outerRadius={140}
+                    >
+
+                      {
+                        datosGrafica.map((item, index) => (
+
+                          <Cell
+                            key={index}
+                            fill={colores[index % colores.length]}
+                          />
+
+                        ))
+                      }
+
+                    </Pie>
+
+                    <Tooltip />
+
+                    <Legend />
+
+                  </PieChart>
+
+                </ResponsiveContainer>
+
+              </div>
+
+              <div className="tarjeta">
+
+                <h2>Resumen por Partido</h2>
+
+                <table className="tabla">
+
+                  <thead>
+
+                    <tr>
+                      <th>Partido</th>
+                      <th>Votos</th>
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {
+                      datosGrafica.map((item, index) => (
+
+                        <tr key={index}>
+
+                          <td>{item.partido}</td>
+
+                          <td>{item.votos}</td>
+
+                        </tr>
+
+                      ))
+                    }
+
+                    <tr className="fila-total">
+
+                      <td>Total</td>
+
+                      <td>{resumen.total_votos}</td>
+
+                    </tr>
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+              <div className="tarjeta">
+
+                <h2>Actas Procesadas</h2>
+
+                <table className="tabla">
+
+                  <thead>
+
+                    <tr>
+                      <th>Archivo</th>
+                      <th>Elección</th>
+                      <th>Distrito</th>
+                      <th>Municipio</th>
+                      <th>Sección</th>
+                      <th>Casilla</th>
+                      <th>Fecha captura</th>
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {
+                      actasProcesadas.map((item, index) => (
+
+                        <tr key={index}>
+
+                          <td>{item.archivo}</td>
+
+                          <td>{item.acta.tipo_eleccion}</td>
+
+                          <td>{item.acta.distrito}</td>
+
+                          <td>{item.acta.municipio}</td>
+
+                          <td>{item.acta.seccion}</td>
+
+                          <td>{item.acta.tipo_casilla}</td>
+
+                          <td>{item.acta.fecha_captura}</td>
+
+                        </tr>
+
+                      ))
+                    }
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            </div>
+
+          </>
+
+        )
+      }
+
+    </div>
+
+  );
+
+}
+
+export default App;
